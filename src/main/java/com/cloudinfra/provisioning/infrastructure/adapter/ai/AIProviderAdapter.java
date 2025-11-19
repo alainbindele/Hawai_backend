@@ -8,7 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
+import java.util.List;
 
 @Slf4j
 @Component
@@ -23,7 +23,8 @@ public class AIProviderAdapter implements AIProviderPort {
         AIModel aiModel,
         CloudProvider cloudProvider,
         String infrastructureDescription,
-        String additionalContext
+        String additionalContext,
+        List<com.ai.Message> conversationHistory
     ) {
         try {
             log.info("Using AI model: {} for cloud provider: {}", aiModel, cloudProvider);
@@ -40,7 +41,7 @@ public class AIProviderAdapter implements AIProviderPort {
             String response;
             if (providerBean instanceof com.ai.AIProvider) {
                 com.ai.AIProvider aiProvider = (com.ai.AIProvider) providerBean;
-                response = aiProvider.sendMessage(userMessage, new ArrayList<>(), systemPrompt);
+                response = aiProvider.sendMessage(userMessage, conversationHistory, systemPrompt);
             } else {
                 throw new IllegalStateException("Provider bean is not an instance of AIProvider");
             }

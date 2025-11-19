@@ -1,11 +1,11 @@
 package com.cloudinfra.provisioning.adapter.web.controller;
 
-import com.cloudinfra.provisioning.adapter.web.dto.InfrastructureInstructionsDTO;
-import com.cloudinfra.provisioning.adapter.web.dto.ProvisioningRequestDTO;
+import com.cloudinfra.provisioning.adapter.web.dto.*;
 import com.cloudinfra.provisioning.adapter.web.mapper.ProvisioningMapper;
-import com.cloudinfra.provisioning.domain.model.InfrastructureInstructions;
+import com.cloudinfra.provisioning.application.service.ConversationalProvisioningService;
+import com.cloudinfra.provisioning.domain.model.AIResponse;
+import com.cloudinfra.provisioning.domain.model.AIResponseType;
 import com.cloudinfra.provisioning.domain.model.ProvisioningRequest;
-import com.cloudinfra.provisioning.domain.ports.in.GenerateInfrastructureUseCase;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,12 +23,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class InfrastructureProvisioningController {
 
-    private final GenerateInfrastructureUseCase generateInfrastructureUseCase;
+    private final ConversationalProvisioningService conversationalProvisioningService;
     private final ProvisioningMapper provisioningMapper;
 
     @PostMapping("/provision")
     @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<InfrastructureInstructionsDTO> generateProvisioningInstructions(
+    public ResponseEntity<AIResponseDTO> generateProvisioningInstructions(
         @Valid @RequestBody ProvisioningRequestDTO requestDTO
     ) {
         log.info("Received provisioning request for {} using {}",
@@ -38,10 +38,45 @@ public class InfrastructureProvisioningController {
 
         ProvisioningRequest request = provisioningMapper.toDomain(requestDTO);
 
-        InfrastructureInstructions instructions = generateInfrastructureUseCase.generateInstructions(request);
+        AIResponse aiResponse = conversationalProvisioningService.initiateProvisioning(request);
 
-        InfrastructureInstructionsDTO responseDTO = provisioningMapper.toDTO(instructions);
+        AIResponseDTO responseDTO = mapAIResponse(aiResponse);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(responseDTO);
+    }
+
+    @PostMapping("/form/data-integration")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<AIResponseDTO> submitFormData(
+        @Valid @RequestBody FormDataDTO formDataDTO
+    ) {
+        log.info("Received form data for conversation: {}", formDataDTO.getConversationId());
+
+        AIResponse aiResponse = conversationalProvisioningService.continueConversation(
+            formDataDTO.getConversationId(),
+            formDataDTO.getData()
+        );
+
+        AIResponseDTO responseDTO = mapAIResponse(aiResponse);
+
+        return ResponseEntity.ok(responseDTO);
+    }
+
+    private AIResponseDTO mapAIResponse(AIResponse aiResponse) {
+        AIResponseDTO dto = AIResponseDTO.builder()
+            .type(aiResponse.getType())
+            .build();
+
+        if (aiResponse.getType() == AIResponseType.PROVISIONING_INSTRUCTIONS) {
+            dto.setInstructions(provisioningMapper.toDTO(aiResponse.getInstructions()));
+        } else if (aiResponse.getType() == AIResponseType.MORE_INFO_REQUIRED) {
+            dto.setFormRequest(FormRequestDTO.builder()
+                .conversationId(aiResponse.getFormRequest().getConversationId())
+                .message(aiResponse.getFormRequest().getMessage())
+                .fields(aiResponse.getFormRequest().getFields())
+                .build());
+        }
+
+        return dto;
     }
 }

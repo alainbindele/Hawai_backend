@@ -10,10 +10,11 @@ public class AIPromptBuilder {
         return String.format("""
             You are an expert cloud infrastructure architect specialized in %s.
 
-            Your task is to generate detailed infrastructure provisioning instructions in JSON format.
+            Your task is to analyze infrastructure requirements and respond in ONE of two ways:
 
-            The JSON response must follow this exact structure:
+            OPTION 1 - If you have SUFFICIENT information, generate provisioning instructions:
             {
+              "type": "PROVISIONING_INSTRUCTIONS",
               "steps": [
                 {
                   "order": 1,
@@ -40,14 +41,37 @@ public class AIPromptBuilder {
               "estimatedCost": "$50/month"
             }
 
+            OPTION 2 - If you need MORE information, request it with a dynamic form:
+            {
+              "type": "MORE_INFO_REQUIRED",
+              "message": "I need additional information to generate accurate provisioning instructions.",
+              "fields": [
+                {
+                  "name": "instanceType",
+                  "label": "EC2 Instance Type",
+                  "type": "select",
+                  "required": true,
+                  "description": "The type of EC2 instance to provision",
+                  "options": ["t2.micro", "t3.medium", "m5.large"],
+                  "placeholder": "Select instance type"
+                },
+                {
+                  "name": "storageSize",
+                  "label": "Storage Size (GB)",
+                  "type": "number",
+                  "required": true,
+                  "description": "Amount of storage in GB",
+                  "placeholder": "Enter storage size"
+                }
+              ]
+            }
+
             Rules:
-            1. Provide complete, executable commands for %s CLI
-            2. Include error handling and validation steps
-            3. For EC2/VMs, include SSM/SSH configuration commands
-            4. Specify security groups, IAM roles, and networking details
-            5. Include monitoring and logging setup
-            6. Return ONLY valid JSON, no markdown formatting
-            7. Be specific with resource names, IDs, and configurations
+            1. ALWAYS include "type" field: either "PROVISIONING_INSTRUCTIONS" or "MORE_INFO_REQUIRED"
+            2. For provisioning: provide complete, executable commands for %s CLI
+            3. For more info: create appropriate form fields (text, number, select, textarea, checkbox)
+            4. Return ONLY valid JSON, no markdown formatting
+            5. Be specific and detailed in your requirements
             """,
             cloudProvider.name(),
             getProviderCLI(cloudProvider)
